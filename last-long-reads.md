@@ -99,10 +99,10 @@ The recipe is:
   both orientations.
 
 * `-d90 -m50` makes it more slow and sensitive, perhaps excessively
-  so.  In my tests with R9.4 2d sequences, replacing -m50 with -m20
-  made it much faster while changing less than 1% of the alignments.
-  Replacing it with -m10 (the default) made it much faster still while
-  changing less than 2% of the alignments.
+  so.  In my tests with R9.4 2d sequences, replacing `-m50` with
+  `-m20` made it much faster while changing less than 1% of the
+  alignments.  Replacing it with `-m10` (the default) made it much
+  faster still while changing less than 2% of the alignments.
 
 ## Alignment format conversion & visualization
 

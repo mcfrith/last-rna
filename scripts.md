@@ -3,8 +3,8 @@
 These scripts compare RNA-genome alignments to gene annotations.  They
 indicate: expression levels, novel exons, and gene fusions.
 
-The scripts require seg-suite to be installed:
-<https://github.com/mcfrith/seg-suite>
+The scripts require [seg-suite](https://github.com/mcfrith/seg-suite)
+to be installed.
 
 They also require a file of gene annotations in UCSC format.  For
 example, you can use `knownGene.txt` or `refGene.txt` from here:
