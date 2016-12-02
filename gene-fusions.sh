@@ -44,7 +44,7 @@ topSegs () {
 }
 
 segFromMaf () {
-    grep -v '^#' "$@" | sed 's/ mismap=/ /' |
+    grep -v '^#' "$@" | sed -e 's/ mismap=/ /' -e 's/ sense=.*//' |
     awk '$3 <= '$maxMismapProb' {print $7, $5, $6, $12, $6}' RS="" |
     seg-sort | seg-merge | seg-sort
 }
