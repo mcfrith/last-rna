@@ -1,9 +1,9 @@
 # Aligning long DNA and RNA reads to a genome
 
-These recipes have been tested on MinION R9.4 human RNA sequences, but
-they should work for any similar kind of data.
+These recipes have been tested on MinION R9.4 human DNA and RNA
+sequences, but they should work for any similar kind of data.
 
-## Setup
+## Requirements
 
 For aligning to a mammal genome, you'll need a few dozen gigabytes of
 memory.
@@ -11,8 +11,20 @@ memory.
 First, install the latest [LAST](http://last.cbrc.jp/) (version >=
 802).
 
-Get a reference genome sequence, in FASTA format.  We need to "index"
-the genome before aligning things to it:
+## Preparing a reference genome
+
+Get a reference genome sequence, in FASTA format.
+
+We need to decide [whether or not to mask
+repeats](http://last.cbrc.jp/doc/last-repeats.html).  Repeat-masking
+harms alignment accuracy (by hiding some correct alignments), but it
+*greatly* reduces the time and memory needed for alignment.  E.g. I
+would probably not mask repeats in order to align 10^8 bases of RNA
+reads, but perhaps I would for 10^11 bases of DNA reads.
+
+### Option 1: Prepare a genome without repeat-masking
+
+We need to "index" the genome before aligning things to it:
 
     lastdb -P8 -uNEAR -R01 mydb genome.fa
 
@@ -25,11 +37,41 @@ the genome before aligning things to it:
   deletion).
 
 * `-R01` makes it indicate "simple sequence" such as `atatatatatatat`
-  by lowercase.  (This actually has no effect on the following
-  alignment recipes, but it keeps open the option to discard
-  simple-sequence alignments.)
+  by lowercase.  This has no effect on the following alignment
+  recipes, but it keeps open the option to [discard simple-sequence
+  alignments](http://last.cbrc.jp/doc/last-postmask.html).
 
-## Pre-alignment
+### Option 2: Prepare a genome with repeat-masking
+
+We wish to mask as little as possible for the sake of alignment
+accuracy, but enough to make the alignment run-time tolerable.  LAST
+can detect simple repeats such as `atatatatatatat`, but not (yet)
+interspersed repeats: for that we can use WindowMasker.
+
+First, obtain [NCBI
+BLAST](ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
+(which includes WindowMasker).
+
+Apply WindowMasker to the genome:
+
+    windowmasker -mk_counts -in genome.fa > genome.wmstat
+    windowmasker -ustat genome.wmstat -outfmt fasta -in genome.fa > genome-wm.fa
+
+This outputs a copy of the genome (`genome-wm.fa`) with interspersed
+repeats in lowercase.
+
+Now index the genome:
+
+    lastdb -P8 -uNEAR -R11 -c mydb genome-wm.fa
+
+* `-R11` tells it to preserve lowercase in the input, and additionally
+  convert simple sequence to lowercase.
+
+* `-c` tells it to "mask" lowercase.  This means that lowercase will
+  be excluded from the early stages of alignment, but included in the
+  final alignment extensions.
+
+## Preparing a set of reads
 
 If the reads are in FASTQ (fq) format, convert them to FASTA (fa),
 e.g. like this:
@@ -49,9 +91,9 @@ substitution and gap rates.
 
 ## Aligning DNA sequences
 
-DNA is easier than RNA, so is described first.  This recipe aligns DNA
-reads to their orthologous bases in the genome, allowing for
-rearrangements and duplications in the reads relative to the genome.
+This recipe aligns DNA reads to their orthologous bases in the genome,
+allowing for rearrangements and duplications in the reads relative to
+the genome.
 
     lastal -P8 -p myseq.par mydb myseq.fa | last-split -m1e-6 > myseq.maf
 
