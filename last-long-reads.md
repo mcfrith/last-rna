@@ -71,12 +71,30 @@ Now index the genome:
   be excluded from the early stages of alignment, but included in the
   final alignment extensions.
 
-## Preparing a set of reads
+## Fastq to fasta
 
-If the reads are in FASTQ (fq) format, convert them to FASTA (fa),
-e.g. like this:
+If the reads are in FASTQ (fq) format, convert them to FASTA (fa):
 
-    awk 'NR % 4 == 1 {print ">" (++x)} NR % 4 == 2' myseq.fq > myseq.fa
+    awk '(NR - 1) % 4 < 2' myseq.fq | sed 's/@/>/' > myseq.fa
+
+## Optional: Fix read identifiers
+
+Each read should have a short, unique "name" or "identifier".
+Unfortunately, these identifiers are often ridiculously long, which
+makes things inefficient and inconvenient.  Worse, unique identifiers
+sometimes contain spaces (which are used as field separators in many
+formats).  One fix is to replace the identifiers with serial numbers:
+
+    awk '/>/ {$0 = ">" ++n} 1' nasty.fa > nice.fa
+
+Some care is needed: if you do this separately for two datasets, and
+later combine them, then the serial numbers will not be unique.
+
+It's possible to fix identifiers while converting fastq->fasta:
+
+    awk 'NR % 4 == 2 {print ">" ++n "\n" $0}' myseq.fq > myseq.fa
+
+## Substitution and gap rates
 
 Next, we can determine alignment parameters (substitution and gap
 scores) that fit these sequences:
