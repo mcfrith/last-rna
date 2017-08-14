@@ -125,6 +125,11 @@ This recipe is perhaps more slow-and-sensitive than necessary:
 [here](http://last.cbrc.jp/doc/last-tuning.html) are some ways to make
 it faster.
 
+If you have big data, you may wish to compress the output.  One way is
+to modify the preceding command like this:
+
+    lastal -P8 -p myseq.par mydb myseq.fa | last-split -m1e-6 | gzip > myseq.maf.gz
+
 ## Aligning RNA sequences
 
 This recipe aligns RNA reads to their orthologous bases in the genome,
