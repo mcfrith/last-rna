@@ -119,7 +119,9 @@ the genome.
 
 * `-m1e-6` tells it to omit any alignment whose probability of having
   the wrong genomic locus is > 10^-6.  (This happens if part of a read
-  matches multiple loci almost equally well.)
+  matches multiple loci almost equally well.)  You may wish to replace
+  this with `-m1` (omit nothing): each alignment's mismap probability
+  is annotated, so you can discard ambiguous ones later.
 
 This recipe is perhaps more slow-and-sensitive than necessary:
 [here](http://last.cbrc.jp/doc/last-tuning.html) are some ways to make
@@ -157,7 +159,7 @@ which can be done like this:
 
 The recipe is:
 
-    parallel-fasta "lastal -p myseq.par -d90 -m50 -D10 mydb | last-split -d2 -g mydb" < myseq.fa > myseq.maf
+    parallel-fasta "lastal -p myseq.par -d90 -m50 -D10 mydb | last-split -m1 -d2 -g mydb" < myseq.fa > myseq.maf
 
 * `-d2` indicates that the RNA reads are from unknown/mixed RNA
   strands.  This makes it check splice signals (such as `gt`-`ag`) in
