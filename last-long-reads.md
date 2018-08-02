@@ -1,15 +1,26 @@
 # Aligning long DNA and RNA reads to a genome
 
-These recipes have been tested on MinION R9.4 human DNA and RNA
-sequences, but they should work for any similar kind of data.
+These recipes are designed for long reads with high rates of insertion
+and deletion error, e.g. nanopore or PacBio.
+
+Strong points of these recipes:
+
+* They determine the rates of insertion, deletion, and each kind of
+  substitution in the reads, and use these rates to determine the most
+  probable alignments.
+
+* They find the most-probable division of each read into (one or more)
+  parts together with the most probable alignment of each part.  So
+  they can handle arbitrarily complex rearrangements and duplications
+  in the reads relative to the genome, and discriminate between
+  similar sequences.
 
 ## Requirements
 
 For aligning to a mammal genome, you'll need a few dozen gigabytes of
 memory.
 
-First, install the latest [LAST](http://last.cbrc.jp/) (version >=
-802).
+First, install the latest [LAST][] (version >= 802).
 
 ## Preparing a reference genome
 
@@ -18,13 +29,21 @@ Get a reference genome sequence, in FASTA format.
 We need to decide [whether or not to mask
 repeats](http://last.cbrc.jp/doc/last-repeats.html).  Repeat-masking
 harms alignment accuracy (by hiding some correct alignments), but it
-*greatly* reduces the time and memory needed for alignment.  E.g. I
-would probably not mask repeats in order to align 10^8 bases of RNA
-reads, but perhaps I would for 10^11 bases of DNA reads.
+*greatly* reduces the time and memory needed for alignment.
+
+* For DNA reads with multiple coverage of a mammal genome: I would
+  probably mask repeats.
+
+* For RNA or cDNA reads: I would probably not mask repeats.
+
+Masking is often harmless.  Masked regions are ignored when finding
+similar regions, but are included in the final alignments.  So masking
+is harmless for alignments that include a bit of unmasked sequence
+next to masked regions.
 
 ### Option 1: Prepare a genome without repeat-masking
 
-We need to "index" the genome before aligning things to it:
+We need to [index][lastdb] the genome before aligning things to it:
 
     lastdb -P8 -uNEAR -R01 mydb genome.fa
 
@@ -37,9 +56,8 @@ We need to "index" the genome before aligning things to it:
   deletion).
 
 * `-R01` makes it indicate "simple sequence" such as `atatatatatatat`
-  by lowercase.  This has no effect on the following alignment
-  recipes, but it keeps open the option to [discard simple-sequence
-  alignments](http://last.cbrc.jp/doc/last-postmask.html).
+  by lowercase.  (This information is used by `last-train`, and
+  potentially other downstream analyses.)
 
 ### Option 2: Prepare a genome with repeat-masking
 
@@ -48,9 +66,7 @@ accuracy, but enough to make the alignment run-time tolerable.  LAST
 can detect simple repeats such as `atatatatatatat`, but not (yet)
 interspersed repeats: for that we can use WindowMasker.
 
-First, obtain [NCBI
-BLAST](ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
-(which includes WindowMasker).
+First, download [NCBI BLAST][] (which includes WindowMasker).
 
 Apply WindowMasker to the genome:
 
@@ -67,9 +83,7 @@ Now index the genome:
 * `-R11` tells it to preserve lowercase in the input, and additionally
   convert simple sequence to lowercase.
 
-* `-c` tells it to "mask" lowercase.  This means that lowercase will
-  be excluded from the early stages of alignment, but included in the
-  final alignment extensions.
+* `-c` tells it to "mask" lowercase.
 
 ## Fastq to fasta
 
@@ -103,15 +117,15 @@ scores) that fit these sequences:
 
 * `-P8` tells it to use 8 processors: modify this as you wish.
 
-The training should be done separately for different kinds of
+The [training][train] should be done separately for different kinds of
 sequence, e.g. MinION 1d and 2d, which are likely to have different
-substitution and gap rates.
+substitution and gap rates.  It should also be done separately for
+sequences with unusual composition, e.g. extremely AT-rich
+*Plasmodium* DNA.
 
 ## Aligning DNA sequences
 
-This recipe aligns DNA reads to their orthologous bases in the genome,
-allowing for rearrangements and duplications in the reads relative to
-the genome.
+This recipe aligns DNA reads to their orthologous bases in the genome:
 
     lastal -P8 -p myseq.par mydb myseq.fa | last-split -m1e-6 > myseq.maf
 
@@ -130,9 +144,11 @@ it faster.
 If you have big data, you may wish to compress the output.  One way is
 to modify the preceding command like this:
 
-    lastal -P8 -p myseq.par mydb myseq.fa | last-split -m1e-6 | gzip > myseq.maf.gz
+    lastal -P8 -p myseq.par mydb myseq.fa | last-split -m1e-6 -fMAF | gzip > myseq.maf.gz
 
-## Aligning RNA sequences
+* `-fMAF` makes it omit per-base mismap probabilities.
+
+## Aligning RNA or cDNA sequences
 
 This recipe aligns RNA reads to their orthologous bases in the genome,
 allowing for exon/intron splicing.  It favors typical human splice
@@ -147,9 +163,8 @@ a processed pseudogene, which lacks introns, allowing a contiguous
 alignment.  This recipe tries to minimize such mistakes, but it
 probably won't avoid them completely.
 
-The recipe requires [GNU
-parallel](https://www.gnu.org/software/parallel/) to be installed,
-which can be done like this:
+The recipe requires [GNU parallel][] to be installed, which can be
+done like this:
 
     wget http://ftpmirror.gnu.org/parallel/parallel-latest.tar.bz2
     bunzip2 parallel-latest.tar.bz2
@@ -160,6 +175,9 @@ which can be done like this:
 The recipe is:
 
     parallel-fasta "lastal -p myseq.par -d90 -m50 -D10 mydb | last-split -m1 -d2 -g mydb" < myseq.fa > myseq.maf
+
+* This will run one parallel job per CPU core.  To specify (say) 8
+  parallel jobs, put `-j8` after `parallel-fasta`.
 
 * `-d2` indicates that the RNA reads are from unknown/mixed RNA
   strands.  This makes it check splice signals (such as `gt`-`ag`) in
@@ -180,6 +198,20 @@ alignments, which can be displayed in genome viewers:
 
 * `-j1e6` tells it to join exons separated by up to 10^6 bases into
   one alignment.
+
+## Aligning RNA or cDNA to a transcriptome?
+
+Untested suggestions:
+
+* Basically, use the above "Aligning DNA sequences" recipe.
+
+* Replace `-m1e-6` with `-m1`.  This is because a read may align
+  ambiguously to multiple overlapping isoforms.
+
+* Perhaps use `lastal` option `-m20` or `-m50`.  This makes it more
+  sensitive but slower. It especially helps to find alignments of
+  sequences that are repeated many times in the reference
+  (e.g. overlapping isoforms).
 
 ## Appendix A: Which genome sequence to use?
 
@@ -215,3 +247,9 @@ and `fail_2d` has a subset of the molecules in `fail_rev`.  Also, the
 `fail_2d` sequences do not seem to be more accurate than the
 `fail_fwd` ones.  So there is little point in using `fail_rev` or
 `fail_2d`.
+
+[LAST]: http://last.cbrc.jp/
+[lastdb]: http://last.cbrc.jp/doc/lastdb.html
+[train]: http://last.cbrc.jp/doc/last-train.html
+[NCBI BLAST]: https://blast.ncbi.nlm.nih.gov/
+[GNU parallel]: https://www.gnu.org/software/parallel/
