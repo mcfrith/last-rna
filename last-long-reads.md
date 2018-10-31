@@ -20,7 +20,7 @@ Strong points of these recipes:
 For aligning to a mammal genome, you'll need a few dozen gigabytes of
 memory.
 
-First, install the latest [LAST][] (version >= 802).
+First, install the latest [LAST][] (version >= 959).
 
 ## Preparing a reference genome
 
@@ -85,39 +85,40 @@ Now index the genome:
 
 * `-c` tells it to "mask" lowercase.
 
-## Fastq to fasta
-
-If the reads are in FASTQ (fq) format, convert them to FASTA (fa):
-
-    awk '(NR - 1) % 4 < 2' myseq.fq | sed 's/@/>/' > myseq.fa
-
 ## Optional: Fix read identifiers
 
 Each read should have a short, unique "name" or "identifier".
 Unfortunately, these identifiers are often ridiculously long, which
 makes things inefficient and inconvenient.  Worse, unique identifiers
 sometimes contain spaces (which are used as field separators in many
-formats).  One fix is to replace the identifiers with serial numbers:
+formats).  One fix is to replace the identifiers with serial numbers.
+
+FASTA -> FASTA with serial numbers:
 
     awk '/>/ {$0 = ">" ++n} 1' nasty.fa > nice.fa
+
+FASTQ -> FASTA with serial numbers:
+
+    awk 'NR % 4 == 2 {print ">" ++n "\n" $0}' myseq.fq > myseq.fa
 
 Some care is needed: if you do this separately for two datasets, and
 later combine them, then the serial numbers will not be unique.
 
-It's possible to fix identifiers while converting fastq->fasta:
-
-    awk 'NR % 4 == 2 {print ">" ++n "\n" $0}' myseq.fq > myseq.fa
-
 ## Substitution and gap rates
 
-Next, we can determine alignment parameters (substitution and gap
-scores) that fit these sequences:
+Next, we can [determine the rates of insertion, deletion, and
+substitutions][train] between our reads and the genome:
 
-    last-train -P8 mydb myseq.fa > myseq.par
+    last-train -P8 -Q0 mydb myseq.fq > myseq.par
+
+* You can supply the reads in either FASTA (`.fa`) or FASTQ (`.fq`)
+  format: it makes no difference.
 
 * `-P8` tells it to use 8 processors: modify this as you wish.
 
-The [training][train] should be done separately for different kinds of
+* `-Q0` tells it to ignore quality data (irrelevant for FASTA).
+
+The training should be done separately for different kinds of
 sequence, e.g. MinION 1d and 2d, which are likely to have different
 substitution and gap rates.  It should also be done separately for
 sequences with unusual composition, e.g. extremely AT-rich
@@ -127,7 +128,7 @@ sequences with unusual composition, e.g. extremely AT-rich
 
 This recipe aligns DNA reads to their orthologous bases in the genome:
 
-    lastal -P8 -p myseq.par mydb myseq.fa | last-split -m1e-6 > myseq.maf
+    lastal -P8 -p myseq.par mydb myseq.fq | last-split -m1e-6 > myseq.maf
 
 * `-P8` tells it to use 8 processors: modify this as you wish.
 
