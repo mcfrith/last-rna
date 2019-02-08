@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 # Copyright 2019 Martin C. Frith
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 from __future__ import print_function
 
