@@ -72,17 +72,17 @@ def gaplessAlignmentParts(lines):
                 if strand == "-":  # get query +strand and reference -strand:
                     qryStart = qrySeqLen - (qryStart + blockLen)
                     refStart = refSeqLen - (refStart + blockLen)
-                yield (qrySeqName, qrySeqLen, qryStart, blockLen, refStart,
+                yield (qrySeqName, qrySeqLen, qryStart, refStart, blockLen,
                        refSeqName, refSeqLen, strand)
 
 def qryEnd(gaplessAlnPart):
-    return gaplessAlnPart[2] + gaplessAlnPart[3]
+    return gaplessAlnPart[2] + gaplessAlnPart[4]
 
 def refEnd(gaplessAlnPart):
-    return gaplessAlnPart[4] + gaplessAlnPart[3]
+    return gaplessAlnPart[3] + gaplessAlnPart[4]
 
 def genomeSegment(gaplessAlnPart):
-    blockLen, refStart, refSeqName, refSeqLen, strand = gaplessAlnPart[3:]
+    refStart, blockLen, refSeqName, refSeqLen, strand = gaplessAlnPart[3:]
     if strand == "-":  # get coordinates in the reference +strand:
         refStart = refSeqLen - (refStart + blockLen)
     return refSeqName, strand, refStart, refStart + blockLen
@@ -99,7 +99,7 @@ def qryUnalignedLengths(gaplessAlnParts):
 def refUnalignedLengths(gaplessAlnParts):
     for x, y in zip(gaplessAlnParts, gaplessAlnParts[1:]):
         refEndX = refEnd(x)
-        refBegY = y[4]
+        refBegY = y[3]
         if x[5:] != y[5:] or refEndX > refBegY:
             yield -1
         elif refEndX < refBegY:
@@ -167,7 +167,7 @@ def main(opts, args):
         for key, group in itertools.groupby(gaplessAlnParts, itemgetter(0, 1)):
             qrySeqName, qrySeqLen = key
             group = sorted(group)
-            alignedBases = sum(i[3] for i in group)
+            alignedBases = sum(i[4] for i in group)
             unalignedHead = group[0][2]
             unalignedTail = qrySeqLen - qryEnd(group[-1])
             qryInserts = list(qryUnalignedLengths(group))
