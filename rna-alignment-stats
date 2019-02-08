@@ -1,0 +1,99 @@
+#! /usr/bin/env python
+# Copyright 2019 Martin C. Frith
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from __future__ import print_function
+
+import gzip
+import itertools
+import optparse
+import signal
+import sys
+from operator import itemgetter
+
+def openFile(fileName):
+    if fileName == "-":
+        return sys.stdin
+    if fileName.endswith(".gz"):
+        return gzip.open(fileName, "rt")  # xxx dubious for Python2
+    return open(fileName)
+
+def ucscIntList(text):
+    items = text.rstrip(",").split(",")
+    return [int(i) for i in items]
+
+def gaplessAlignmentParts(lines):
+    for line in lines:
+        fields = line.split()
+        if fields and fields[0].isdigit():
+            if fields[8].isdigit():
+                fields.pop(0)
+            strand = fields[8]
+            qrySeqName = fields[9]
+            qrySeqLen = int(fields[10])
+            refSeqName = fields[13]
+            if "linker" in refSeqName:
+                continue
+            refSeqLen = int(fields[14])
+            blockLengths = ucscIntList(fields[18])
+            qryStarts = ucscIntList(fields[19])
+            refStarts = ucscIntList(fields[20])
+            blocks = zip(blockLengths, qryStarts, refStarts)
+            for blockLen, qryStart, refStart in blocks:
+                if strand == "-":  # get query +strand and reference -strand:
+                    qryStart = qrySeqLen - (qryStart + blockLen)
+                    refStart = refSeqLen - (refStart + blockLen)
+                yield (qrySeqName, qrySeqLen, qryStart, blockLen, refStart,
+                       refSeqName, refSeqLen, strand)
+
+def qryEnd(gaplessAlnPart):
+    return gaplessAlnPart[2] + gaplessAlnPart[3]
+
+def refEnd(gaplessAlnPart):
+    return gaplessAlnPart[4] + gaplessAlnPart[3]
+
+def qryUnalignedLengths(gaplessAlnParts):
+    for x, y in zip(gaplessAlnParts, gaplessAlnParts[1:]):
+        qryEndX = qryEnd(x)
+        qryBegY = y[2]
+        if qryEndX < qryBegY:
+            yield qryBegY - qryEndX
+        elif qryEndX > qryBegY:
+            raise Exception("unexpected alignment overlap in the query")
+
+def refUnalignedLengths(gaplessAlnParts):
+    for x, y in zip(gaplessAlnParts, gaplessAlnParts[1:]):
+        refEndX = refEnd(x)
+        refBegY = y[4]
+        if x[5:] != y[5:] or refEndX > refBegY:
+            yield -1
+        elif refEndX < refBegY:
+            yield refBegY - refEndX
+
+def main(opts, args):
+    alnFiles = args if args else ["-"]
+    for fileName in alnFiles:
+        gaplessAlnParts = gaplessAlignmentParts(openFile(fileName))
+        for key, group in itertools.groupby(gaplessAlnParts, itemgetter(0, 1)):
+            qrySeqName, qrySeqLen = key
+            group = sorted(group)
+            alignedBases = sum(i[3] for i in group)
+            unalignedHead = group[0][2]
+            unalignedTail = qrySeqLen - qryEnd(group[-1])
+            qryInserts = list(qryUnalignedLengths(group))
+            qryInsMax = max(qryInserts) if qryInserts else 0
+            refJumps = list(refUnalignedLengths(group))
+            isNonlinear = any(i < 0 for i in refJumps)
+            refInserts = [i for i in refJumps if i > 0]
+            refInsMax = max(refInserts) if refInserts else 0
+            out = (qrySeqName, qrySeqLen, alignedBases, unalignedHead,
+                   unalignedTail, qryInsMax, refInsMax, int(isNonlinear))
+            print(*out, sep="\t")
+
+if __name__ == "__main__":
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)  # avoid silly error message
+    usage = "%prog [options] alignments.psl"
+    descr = "Print a table of summary statistics for RNA-to-genome alignments."
+    op = optparse.OptionParser(usage=usage, description=descr)
+    opts, args = op.parse_args()
+    main(opts, args)

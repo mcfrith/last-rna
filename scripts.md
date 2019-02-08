@@ -1,9 +1,40 @@
 # Scripts to analyze LAST RNA-genome alignments
 
-These scripts compare RNA-genome alignments to gene annotations.  They
-indicate: expression levels, novel exons, and gene fusions.
+These scripts analyze alignments of RNA (or cDNA) to a genome, and
+compare them to gene annotations.  They indicate: expression levels,
+novel exons, and gene fusions.
 
-The scripts require [seg-suite](https://github.com/mcfrith/seg-suite)
+## rna-alignment-stats
+
+This script makes a summary table of RNA-to-genome alignments.  **It
+assumes the aligned query sequences are all from RNA forward
+strands**.  Usage:
+
+    rna-alignment-stats alignments.psl > table.txt
+
+It outputs a table with one row per RNA:
+
+    myRNA1  440     265     84      74      4       997     0
+    myRNA2  1934    1498    95      76      222     10      1
+    myRNA3  639     454     97      79      3       6       0
+
+* Column 1: RNA name.
+* Column 2: RNA length.
+* Column 3: Number of aligned RNA bases.
+* Column 4: Unaligned RNA 5'-end bases (maybe linker sequence).
+* Column 5: Unaligned RNA 3'-end bases (maybe linker sequence).
+* Column 6: Maximum run of unaligned RNA bases between aligned bases.
+  If this is large, it might indicate an exon that failed to align.
+* Column 7: Maximum run of unaligned genome bases between aligned
+  bases.  If this is greater than ~50 (for human), it might be an
+  intron.
+* Column 8: `1` means the alignment is not colinear: it involves > 1
+  chromosome, or both DNA strands, or it jumps backwards on the same
+  strand.
+
+## Other scripts
+
+These scripts require [seg-suite](https://github.com/mcfrith/seg-suite)
 to be installed.
 
 They also require a file of gene annotations in UCSC format.  For
@@ -11,7 +42,7 @@ example, you can use `knownGene.txt` or `refGene.txt` from here:
 <http://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/>.  Be sure
 to use the *same* genome version for alignment and annotation!
 
-The scripts assume that the RNA sequences are of unknown/mixed
+These scripts assume that the RNA sequences are of unknown/mixed
 strands.  So they compare the RNAs to gene annotations on both
 strands.  (Actually, strandedness is often indicated by splice signals
 such as `gt-ag`: currently the scripts ignore this information.)
