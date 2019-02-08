@@ -9,6 +9,7 @@ import itertools
 import optparse
 import signal
 import sys
+from bisect import bisect
 from operator import itemgetter
 
 def openFile(fileName):
@@ -21,6 +22,34 @@ def openFile(fileName):
 def ucscIntList(text):
     items = text.rstrip(",").split(",")
     return [int(i) for i in items]
+
+def genesFromFile(lines):
+    for line in lines:
+        fields = line.split()
+        geneNames = []
+        if fields[2] not in ("+", "-"):
+            if len(fields) < 13:  # refFlat
+                geneNames.append(fields[0])
+            fields.pop(0)
+        if len(fields) > 11:  # genePredExt
+            geneNames.append(fields[11])
+        geneNames.append(fields[0])
+        chroName = fields[1]
+        strand = fields[2]
+        exonBegs = ucscIntList(fields[8])
+        exonEnds = ucscIntList(fields[9])
+        beg = exonBegs[0]
+        end = exonEnds[-1]
+        exons = list(zip(exonBegs, exonEnds))
+        yield chroName, strand, beg, end, exons, ",".join(geneNames)
+
+def genesPerStrand(lines):
+    s = sorted(genesFromFile(lines))
+    for key, group in itertools.groupby(s, itemgetter(0, 1)):
+        genes = [i[2:] for i in group]
+        maxSpan = max(end - beg for beg, end, exons, name in genes)
+        value = genes, maxSpan
+        yield key, value
 
 def gaplessAlignmentParts(lines):
     for line in lines:
@@ -52,6 +81,12 @@ def qryEnd(gaplessAlnPart):
 def refEnd(gaplessAlnPart):
     return gaplessAlnPart[4] + gaplessAlnPart[3]
 
+def genomeSegment(gaplessAlnPart):
+    blockLen, refStart, refSeqName, refSeqLen, strand = gaplessAlnPart[3:]
+    if strand == "-":  # get coordinates in the reference +strand:
+        refStart = refSeqLen - (refStart + blockLen)
+    return refSeqName, strand, refStart, refStart + blockLen
+
 def qryUnalignedLengths(gaplessAlnParts):
     for x, y in zip(gaplessAlnParts, gaplessAlnParts[1:]):
         qryEndX = qryEnd(x)
@@ -70,8 +105,63 @@ def refUnalignedLengths(gaplessAlnParts):
         elif refEndX < refBegY:
             yield refBegY - refEndX
 
+def overlapLengths(xSegments, ySegments):
+    # xxx This double-loop risks being very slow.  In practice, it
+    # seems fast enough, so far...
+    for xBeg, xEnd in xSegments:
+        for yBeg, yEnd in ySegments:
+            if yEnd > xBeg:
+                if yBeg >= xEnd:
+                    break
+                yield min(xEnd, yEnd) - max(xBeg, yBeg)
+
+def segmentLengthsBef(segments, cutPos):
+    for beg, end in segments:
+        if beg < cutPos:
+            yield min(end, cutPos) - beg
+
+def segmentLengthsAft(segments, cutPos):
+    for beg, end in segments:
+        if end > cutPos:
+            yield end - max(beg, cutPos)
+
+def geneOverlapData(allGenes, gaplessAlnParts):
+    geneName = "."
+    geneSize = overlapSize = geneSizeBefAln = geneSizeAftAln = 0
+    alnSegments = sorted(map(genomeSegment, gaplessAlnParts))
+    for key, group in itertools.groupby(alnSegments, itemgetter(0, 1)):
+        if key in allGenes:
+            strand = key[1]
+            genes, maxGeneSpan = allGenes[key]
+            segments = [i[2:] for i in group]
+            alnBeg = segments[0][0]
+            alnEnd = segments[-1][1]
+            lookMeUp = alnEnd, alnEnd
+            genesIndex = bisect(genes, lookMeUp)
+            while genesIndex > 0:
+                genesIndex -= 1
+                geneBeg, geneEnd, exons, name = genes[genesIndex]
+                if geneEnd <= alnBeg:
+                    if geneBeg + maxGeneSpan <= alnBeg:
+                        break
+                    continue
+                s = sum(overlapLengths(segments, exons))
+                thisGeneSize = sum(end - beg for beg, end in exons)
+                if (s, -thisGeneSize) > (overlapSize, -geneSize):
+                    geneName = name
+                    geneSize = thisGeneSize
+                    overlapSize = s
+                    bef = sum(segmentLengthsBef(exons, alnBeg))
+                    aft = sum(segmentLengthsAft(exons, alnEnd))
+                    geneSizeBefAln = bef if strand == "+" else aft
+                    geneSizeAftAln = aft if strand == "+" else bef
+    return geneName, geneSize, overlapSize, geneSizeBefAln, geneSizeAftAln
+
 def main(opts, args):
     alnFiles = args if args else ["-"]
+    allGenes = {}
+    if opts.genes:
+        allGenes.update(genesPerStrand(openFile(opts.genes)))
     for fileName in alnFiles:
         gaplessAlnParts = gaplessAlignmentParts(openFile(fileName))
         for key, group in itertools.groupby(gaplessAlnParts, itemgetter(0, 1)):
@@ -88,6 +178,8 @@ def main(opts, args):
             refInsMax = max(refInserts) if refInserts else 0
             out = (qrySeqName, qrySeqLen, alignedBases, unalignedHead,
                    unalignedTail, qryInsMax, refInsMax, int(isNonlinear))
+            if opts.genes:
+                out += geneOverlapData(allGenes, group)
             print(*out, sep="\t")
 
 if __name__ == "__main__":
@@ -95,5 +187,7 @@ if __name__ == "__main__":
     usage = "%prog [options] alignments.psl"
     descr = "Print a table of summary statistics for RNA-to-genome alignments."
     op = optparse.OptionParser(usage=usage, description=descr)
+    op.add_option("-g", "--genes", metavar="FILE",
+                  help="read genes from a genePred file")
     opts, args = op.parse_args()
     main(opts, args)

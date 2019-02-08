@@ -4,6 +4,8 @@ These scripts analyze alignments of RNA (or cDNA) to a genome, and
 compare them to gene annotations.  They indicate: expression levels,
 novel exons, and gene fusions.
 
+Note: be sure to use alignments and annotations of the same genome version!
+
 ## rna-alignment-stats
 
 This script makes a summary table of RNA-to-genome alignments.  **It
@@ -32,6 +34,29 @@ It outputs a table with one row per RNA:
   chromosome, or both DNA strands, or it jumps backwards on the same
   strand.
 
+Optionally, you can give it gene annotations in [genePred][] format
+(e.g. from [here](http://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/)):
+
+    rna-alignment-stats -g refGene.txt alignments.psl > table.txt
+
+This finds, for each RNA, the gene whose exons cover the most aligned
+bases on the same strand.  Extra columns appear in the output:
+
+    RPL19,NM_000981 737     265     3       458
+    .               0       0       0       0
+
+* Column 9: Gene name.  If it can find the information in the
+  annotation file, it writes `geneName,isoformName`.
+* Column 10: Gene length (sum of exon lengths).
+* Column 11: Aligned RNA bases in exons.
+* Column 12: Exon bases before the alignment's 5'-end.
+* Column 13: Exon bases after the alignment's 3'-end.
+
+If two or more annotations equally cover the most aligned bases, the
+shortest is chosen (i.e. column 10 is minimized).
+
+[genePred]: https://genome.ucsc.edu/FAQ/FAQformat.html#format9
+
 ## Other scripts
 
 These scripts require [seg-suite](https://github.com/mcfrith/seg-suite)
@@ -39,8 +64,7 @@ to be installed.
 
 They also require a file of gene annotations in UCSC format.  For
 example, you can use `knownGene.txt` or `refGene.txt` from here:
-<http://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/>.  Be sure
-to use the *same* genome version for alignment and annotation!
+<http://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/>.
 
 These scripts assume that the RNA sequences are of unknown/mixed
 strands.  So they compare the RNAs to gene annotations on both
