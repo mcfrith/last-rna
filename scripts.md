@@ -16,9 +16,9 @@ strands**.  Usage:
 
 It outputs a table with one row per RNA:
 
-    myRNA1  440     265     84      74      4       997     0
-    myRNA2  1934    1498    95      76      222     10      1
-    myRNA3  639     454     97      79      3       6       0
+    myRNA1  440     265     84      74      4       997     0       chr17
+    myRNA2  1934    1498    95      76      222     10      1       chr16
+    myRNA3  639     454     97      79      3       6       0       chr22
 
 * Column 1: RNA name.
 * Column 2: RNA length.
@@ -33,6 +33,7 @@ It outputs a table with one row per RNA:
 * Column 8: `1` means the alignment is not colinear: it involves > 1
   chromosome, or both DNA strands, or it jumps backwards on the same
   strand.
+* Column 9: Chromosome to which it's (mostly) aligned.
 
 Optionally, you can give it gene annotations in [genePred][] format
 (e.g. from [here](http://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/)):
@@ -45,12 +46,12 @@ bases on the same strand.  Extra columns appear in the output:
     RPL19,NM_000981 737     265     3       458
     .               0       0       0       0
 
-* Column 9: Gene name.  If it can find the information in the
+* Column 10: Gene name.  If it can find the information in the
   annotation file, it writes `geneName,isoformName`.
-* Column 10: Gene length (sum of exon lengths).
-* Column 11: Aligned RNA bases in exons.
-* Column 12: Exon bases before the alignment's 5'-end.
-* Column 13: Exon bases after the alignment's 3'-end.
+* Column 11: Gene length (sum of exon lengths).
+* Column 12: Aligned RNA bases in exons.
+* Column 13: Exon bases before the alignment's 5'-end.
+* Column 14: Exon bases after the alignment's 3'-end.
 
 If two or more annotations equally cover the most aligned bases, the
 shortest is chosen (i.e. column 10 is minimized).

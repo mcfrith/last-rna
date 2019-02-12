@@ -10,6 +10,7 @@ import optparse
 import signal
 import sys
 from bisect import bisect
+from collections import defaultdict
 from operator import itemgetter
 
 def openFile(fileName):
@@ -157,6 +158,14 @@ def geneOverlapData(allGenes, gaplessAlnParts):
                     geneSizeAftAln = aft if strand == "+" else bef
     return geneName, geneSize, overlapSize, geneSizeBefAln, geneSizeAftAln
 
+def mainRefSeqName(gaplessAlnParts):
+    d = defaultdict(int)
+    for i in gaplessAlnParts:
+        blockLen, refSeqName = i[4:6]
+        d[refSeqName] -= blockLen
+    mainName, junk = min(d.items(), key=itemgetter(1, 0))
+    return mainName
+
 def main(opts, args):
     alnFiles = args if args else ["-"]
     allGenes = {}
@@ -176,8 +185,9 @@ def main(opts, args):
             isNonlinear = any(i < 0 for i in refJumps)
             refInserts = [i for i in refJumps if i > 0]
             refInsMax = max(refInserts) if refInserts else 0
+            chro = mainRefSeqName(group)
             out = (qrySeqName, qrySeqLen, alignedBases, unalignedHead,
-                   unalignedTail, qryInsMax, refInsMax, int(isNonlinear))
+                   unalignedTail, qryInsMax, refInsMax, int(isNonlinear), chro)
             if opts.genes:
                 out += geneOverlapData(allGenes, group)
             print(*out, sep="\t")
