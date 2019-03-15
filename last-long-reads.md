@@ -175,20 +175,25 @@ done like this:
 
 The recipe is:
 
-    parallel-fasta "lastal -p myseq.par -d90 -m50 -D10 mydb | last-split -m1 -d2 -g mydb" < myseq.fa > myseq.maf
+    parallel-fasta "lastal -p myseq.par -d90 -m20 -D10 mydb | last-split -m1 -d2 -g mydb" < myseq.fa > myseq.maf
 
 * This will run one parallel job per CPU core.  To specify (say) 8
   parallel jobs, put `-j8` after `parallel-fasta`.
 
-* `-d2` indicates that the RNA reads are from unknown/mixed RNA
-  strands.  This makes it check splice signals (such as `gt`-`ag`) in
-  both orientations.
+* `-d2` indicates that the reads are a mixture of RNA forward and
+  reverse strands.  This makes it check splice signals (such as
+  `gt`-`ag`) in both orientations.  **If your reads are all of RNA
+  forward strands, omit `-d2`.**
 
-* `-d90 -m50` makes it more slow and sensitive, perhaps excessively
-  so.  In my tests with R9.4 2d sequences, replacing `-m50` with
-  `-m20` made it much faster while changing less than 1% of the
-  alignments.  Replacing it with `-m10` (the default) made it much
-  faster still while changing less than 2% of the alignments.
+* `-d90 -m20` makes it more accurate but slow.
+
+    - For even higher accuracy (but slowness), I would use `-m50`
+      instead of `-m20`.  In my tests with R9.4 2d sequences, this
+      changed less than 1% of the alignments.
+
+    - For higher speed (but lower accuracy), omit `-m20`.  In my
+      tests, this changed less than 2% of the alignments compared to
+      `-m50`.
 
 ## Alignment format conversion & visualization
 
