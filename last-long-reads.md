@@ -128,15 +128,14 @@ sequences with unusual composition, e.g. extremely AT-rich
 
 This recipe aligns DNA reads to their orthologous bases in the genome:
 
-    lastal -P8 -p myseq.par mydb myseq.fq | last-split -m1e-6 > myseq.maf
+    lastal -P8 -p myseq.par mydb myseq.fq | last-split -m1 > myseq.maf
 
 * `-P8` tells it to use 8 processors: modify this as you wish.
 
-* `-m1e-6` tells it to omit any alignment whose probability of having
-  the wrong genomic locus is > 10^-6.  (This happens if part of a read
-  matches multiple loci almost equally well.)  You may wish to replace
-  this with `-m1` (omit nothing): each alignment's mismap probability
-  is annotated, so you can discard ambiguous ones later.
+* `-m1` tells it to not discard alignments with high mismap
+  probability (if part of a read matches multiple loci almost equally
+  well).  Each alignment's mismap probability is annotated, so you can
+  discard ambiguous ones later.
 
 This recipe is perhaps more slow-and-sensitive than necessary:
 [here](http://last.cbrc.jp/doc/last-tuning.html) are some ways to make
@@ -145,7 +144,7 @@ it faster.
 If you have big data, you may wish to compress the output.  One way is
 to modify the preceding command like this:
 
-    lastal -P8 -p myseq.par mydb myseq.fa | last-split -m1e-6 -fMAF | gzip > myseq.maf.gz
+    lastal -P8 -p myseq.par mydb myseq.fa | last-split -m1 -fMAF | gzip > myseq.maf.gz
 
 * `-fMAF` makes it omit per-base mismap probabilities.
 
@@ -210,9 +209,6 @@ alignments, which can be displayed in genome viewers:
 Untested suggestions:
 
 * Basically, use the above "Aligning DNA sequences" recipe.
-
-* Replace `-m1e-6` with `-m1`.  This is because a read may align
-  ambiguously to multiple overlapping isoforms.
 
 * Perhaps use `lastal` option `-m20` or `-m50`.  This makes it more
   sensitive but slower. It especially helps to find alignments of
