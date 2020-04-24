@@ -3,6 +3,8 @@
 # Read MAF-format alignments from last-split, and classify the
 # alignment of each query.
 
+from __future__ import print_function
+
 import itertools
 import operator
 import optparse
@@ -63,7 +65,7 @@ def doOneQuery(opts, qName, alignments):
     else:            unspliced = "S"
     text = "".join(partsFromAlignments(alignments, opts))
     out = transSpliced, unspliced, text
-    print qName + "\t" + ":".join(out)
+    print(qName, ":".join(out), sep="\t")
 
 def doOneFile(opts, lines):
     alignments = mafInput(opts, lines)
