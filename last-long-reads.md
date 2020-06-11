@@ -20,7 +20,8 @@ Strong points of these recipes:
 For aligning to a mammal genome, you'll need a few dozen gigabytes of
 memory.
 
-First, install the latest [LAST][] (version >= 959).
+First, install the latest [LAST][].  **This document assumes LAST
+version >= 983!!!**
 
 ## Preparing a reference genome
 
@@ -85,25 +86,6 @@ Now index the genome:
 
 * `-c` tells it to "mask" lowercase.
 
-## Optional: Fix read identifiers
-
-Each read should have a short, unique "name" or "identifier".
-Unfortunately, these identifiers are often ridiculously long, which
-makes things inefficient and inconvenient.  Worse, unique identifiers
-sometimes contain spaces (which are used as field separators in many
-formats).  One fix is to replace the identifiers with serial numbers.
-
-FASTA -> FASTA with serial numbers:
-
-    awk '/>/ {$0 = ">" ++n} 1' nasty.fa > nice.fa
-
-FASTQ -> FASTA with serial numbers:
-
-    awk 'NR % 4 == 2 {print ">" ++n "\n" $0}' myseq.fq > myseq.fa
-
-Some care is needed: if you do this separately for two datasets, and
-later combine them, then the serial numbers will not be unique.
-
 ## Substitution and gap rates
 
 Next, we can [determine the rates of insertion, deletion, and
@@ -124,31 +106,28 @@ substitution and gap rates.  It should also be done separately for
 sequences with unusual composition, e.g. extremely AT-rich
 *Plasmodium* DNA.
 
-## Aligning DNA sequences
+## Aligning DNA (or unspliced RNA) sequences
 
 This recipe aligns DNA reads to their orthologous bases in the genome:
 
-    lastal -P8 -p myseq.par mydb myseq.fq | last-split -m1 > myseq.maf
+    lastal -P8 -p myseq.par mydb myseq.fq | last-split > myseq.maf
 
 * `-P8` tells it to use 8 processors: modify this as you wish.
 
-* `-m1` tells it to not discard alignments with high mismap
-  probability (if part of a read matches multiple loci almost equally
-  well).  Each alignment's mismap probability is annotated, so you can
-  discard ambiguous ones later.
-
-This recipe is perhaps more slow-and-sensitive than necessary:
-[here](http://last.cbrc.jp/doc/last-tuning.html) are some ways to make
-it faster.
+To make it faster (but less accurate), add `lastal` option `-k8`
+(say).  This should still be accurate for straightforward alignments,
+but perhaps not for intricately rearranged alignments.  (Other
+[performance tuning
+options](http://last.cbrc.jp/doc/last-tuning.html).)
 
 If you have big data, you may wish to compress the output.  One way is
 to modify the preceding command like this:
 
-    lastal -P8 -p myseq.par mydb myseq.fa | last-split -m1 -fMAF | gzip > myseq.maf.gz
+    lastal -P8 -p myseq.par mydb myseq.fq | last-split -fMAF | gzip > myseq.maf.gz
 
 * `-fMAF` makes it omit per-base mismap probabilities.
 
-## Aligning RNA or cDNA sequences
+## Spliced alignment of RNA or cDNA sequences
 
 This recipe aligns RNA reads to their orthologous bases in the genome,
 allowing for exon/intron splicing.  It favors typical human splice
@@ -174,15 +153,15 @@ done like this:
 
 The recipe is:
 
-    parallel-fasta "lastal -p myseq.par -d90 -m20 -D10 mydb | last-split -m1 -d2 -g mydb" < myseq.fa > myseq.maf
+    parallel-fasta "lastal -p myseq.par -d90 -m20 -D10 mydb | last-split -g mydb" < myseq.fq > myseq.maf
 
 * This will run one parallel job per CPU core.  To specify (say) 8
   parallel jobs, put `-j8` after `parallel-fasta`.
 
-* `-d2` indicates that the reads are a mixture of RNA forward and
-  reverse strands.  This makes it check splice signals (such as
-  `gt`-`ag`) in both orientations.  **If your reads are all of RNA
-  forward strands, omit `-d2`.**
+* **It assumes the reads are from forward strands of transcripts!!!**
+  If your reads are a mixture of forward and reverse strands, add
+  `last-split` option `-d2`: that makes it check splice signals (such
+  as `gt`-`ag`) in both orientations.
 
 * `-d90 -m20` makes it more accurate but slow.
 
@@ -208,12 +187,18 @@ alignments, which can be displayed in genome viewers:
 
 Untested suggestions:
 
-* Basically, use the above "Aligning DNA sequences" recipe.
+* Basically, use the above "Aligning DNA (or unspliced RNA) sequences"
+  recipe.
 
 * Perhaps use `lastal` option `-m20` or `-m50`.  This makes it more
   sensitive but slower. It especially helps to find alignments of
   sequences that are repeated many times in the reference
   (e.g. overlapping isoforms).
+
+## Changes
+
+2020-06-11: Previously, `last-split` option `-m1` was specified.  But
+            this is the default setting since LAST 983.
 
 ## Appendix A: Which genome sequence to use?
 
@@ -249,6 +234,25 @@ and `fail_2d` has a subset of the molecules in `fail_rev`.  Also, the
 `fail_2d` sequences do not seem to be more accurate than the
 `fail_fwd` ones.  So there is little point in using `fail_rev` or
 `fail_2d`.
+
+## Appendix C: Fixing read identifiers
+
+Each read should have a short, unique "name" or "identifier".
+Unfortunately, these identifiers are often ridiculously long, which
+makes things inefficient and inconvenient.  Worse, unique identifiers
+sometimes contain spaces (which are used as field separators in many
+formats).  One fix is to replace the identifiers with serial numbers.
+
+FASTA -> FASTA with serial numbers:
+
+    awk '/>/ {$0 = ">" ++n} 1' nasty.fa > nice.fa
+
+FASTQ -> FASTA with serial numbers:
+
+    awk 'NR % 4 == 2 {print ">" ++n "\n" $0}' myseq.fq > myseq.fa
+
+Some care is needed: if you do this separately for two datasets, and
+later combine them, then the serial numbers will not be unique.
 
 [LAST]: http://last.cbrc.jp/
 [lastdb]: http://last.cbrc.jp/doc/lastdb.html
