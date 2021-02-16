@@ -28,9 +28,10 @@ version >= 983!!!**
 Get a reference genome sequence, in FASTA format.
 
 We need to decide [whether or not to mask
-repeats](http://last.cbrc.jp/doc/last-repeats.html).  Repeat-masking
-harms alignment accuracy (by hiding some correct alignments), but it
-*greatly* reduces the time and memory needed for alignment.
+repeats](https://gitlab.com/mcfrith/last/-/blob/main/doc/last-repeats.rst).
+Repeat-masking harms alignment accuracy (by hiding some correct
+alignments), but it *greatly* reduces the time and memory needed for
+alignment.
 
 * For DNA reads with multiple coverage of a mammal genome: I would
   probably mask repeats.
@@ -118,14 +119,12 @@ To make it faster (but less accurate), add `lastal` option `-k8`
 (say).  This should still be accurate for straightforward alignments,
 but perhaps not for intricately rearranged alignments.  (Other
 [performance tuning
-options](http://last.cbrc.jp/doc/last-tuning.html).)
+options](https://gitlab.com/mcfrith/last/-/blob/main/doc/last-tuning.rst).)
 
 If you have big data, you may wish to compress the output.  One way is
 to modify the preceding command like this:
 
-    lastal -P8 -p myseq.par mydb myseq.fq | last-split -fMAF | gzip > myseq.maf.gz
-
-* `-fMAF` makes it omit per-base mismap probabilities.
+    lastal -P8 -p myseq.par mydb myseq.fq | last-split | gzip > myseq.maf.gz
 
 ## Spliced alignment of RNA or cDNA sequences
 
@@ -153,10 +152,9 @@ done like this:
 
 The recipe is:
 
-    parallel-fasta "lastal -p myseq.par -d90 -m20 -D10 mydb | last-split -g mydb" < myseq.fq > myseq.maf
+    parallel-fasta -j8 "lastal -p myseq.par -d90 -m20 -D10 mydb | last-split -g mydb" < myseq.fq > myseq.maf
 
-* This will run one parallel job per CPU core.  To specify (say) 8
-  parallel jobs, put `-j8` after `parallel-fasta`.
+* `-j8` tells it to run 8 parallel jobs.
 
 * **It assumes the reads are from forward strands of transcripts!!!**
   If your reads are a mixture of forward and reverse strands, add
@@ -196,6 +194,9 @@ Untested suggestions:
   (e.g. overlapping isoforms).
 
 ## Changes
+
+2021-02-16: Previously, `last-split` option `-fMAF` was suggested.
+            But this is the default setting since LAST 1180.
 
 2020-06-11: Previously, `last-split` option `-m1` was specified.  But
             this is the default setting since LAST 983.
@@ -254,8 +255,8 @@ FASTQ -> FASTA with serial numbers:
 Some care is needed: if you do this separately for two datasets, and
 later combine them, then the serial numbers will not be unique.
 
-[LAST]: http://last.cbrc.jp/
-[lastdb]: http://last.cbrc.jp/doc/lastdb.html
-[train]: http://last.cbrc.jp/doc/last-train.html
+[LAST]: https://gitlab.com/mcfrith/last
+[lastdb]: https://gitlab.com/mcfrith/last/-/blob/main/doc/lastdb.rst
+[train]: https://gitlab.com/mcfrith/last/-/blob/main/doc/last-train.rst
 [NCBI BLAST]: https://blast.ncbi.nlm.nih.gov/
 [GNU parallel]: https://www.gnu.org/software/parallel/
