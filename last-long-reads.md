@@ -1,8 +1,8 @@
 # Aligning long DNA and RNA reads to a genome
 
-These recipes are designed for long reads with high rates of insertion
-and deletion error, e.g. nanopore or PacBio.
-
+These recipes are designed for "long" reads, e.g. nanopore or PacBio
+([see
+also](https://gitlab.com/mcfrith/last/-/blob/main/doc/last-cookbook.rst)).
 Strong points of these recipes:
 
 * They determine the rates of insertion, deletion, and each kind of
@@ -18,7 +18,9 @@ Strong points of these recipes:
 ## Requirements
 
 For aligning to a mammal genome, you'll need a few dozen gigabytes of
-memory.
+memory ([or
+less](https://gitlab.com/mcfrith/last/-/blob/main/doc/last-cookbook.rst)
+with `lastdb` option `-uRY`).
 
 First, install the latest [LAST][].  **This document assumes LAST
 version >= 983!!!**
@@ -47,19 +49,17 @@ next to masked regions.
 
 We need to [index][lastdb] the genome before aligning things to it:
 
-    lastdb -P8 -uNEAR -R01 mydb genome.fa
+    lastdb -P8 -uNEAR mydb genome.fa
 
-* This will create several files with names starting in "mydb".
+This will create several files with names starting in "mydb".  It will
+detect and lowercase simple repeats, but it won't "mask" them.
 
-* `-P8` tells it to use 8 processors: modify this as you wish.
+* `-P8` makes it faster by running 8 parallel threads, adjust as
+  appropriate for your computer.  This has no effect on the results.
 
 * `-uNEAR` tunes it for finding alignments with low rates of
   substitution (especially if they have high rates of insertion or
   deletion).
-
-* `-R01` makes it indicate "simple sequence" such as `atatatatatatat`
-  by lowercase.  (This information is used by `last-train`, and
-  potentially other downstream analyses.)
 
 ### Option 2: Prepare a genome with repeat-masking
 
@@ -97,9 +97,11 @@ substitutions][train] between our reads and the genome:
 * You can supply the reads in either FASTA (`.fa`) or FASTQ (`.fq`)
   format: it makes no difference.
 
-* `-P8` tells it to use 8 processors: modify this as you wish.
+* `-P8` makes it faster by running 8 parallel threads (no effect on
+  results).
 
-* `-Q0` tells it to ignore quality data (irrelevant for FASTA).
+* `-Q0` makes it discard fastq quality data (or you can
+  keep-but-ignore it with `-Qkeep`).
 
 The training should be done separately for different kinds of
 sequence, e.g. MinION 1d and 2d, which are likely to have different
@@ -113,13 +115,12 @@ This recipe aligns DNA reads to their orthologous bases in the genome:
 
     lastal -P8 -p myseq.par mydb myseq.fq | last-split > myseq.maf
 
-* `-P8` tells it to use 8 processors: modify this as you wish.
-
 To make it faster (but less accurate), add `lastal` option `-k8`
 (say).  This should still be accurate for straightforward alignments,
-but perhaps not for intricately rearranged alignments.  (Other
-[performance tuning
-options](https://gitlab.com/mcfrith/last/-/blob/main/doc/last-tuning.rst).)
+but perhaps not for intricately rearranged alignments.  (See also
+[here](https://gitlab.com/mcfrith/last/-/blob/main/doc/last-cookbook.rst)
+and
+[here](https://gitlab.com/mcfrith/last/-/blob/main/doc/last-tuning.rst)).
 
 If you have big data, you may wish to compress the output.  One way is
 to modify the preceding command like this:
@@ -194,6 +195,9 @@ Untested suggestions:
   (e.g. overlapping isoforms).
 
 ## Changes
+
+2021-03: Previously, `lastdb` option `-R01` was suggested.  But this
+         is the default setting since LAST 1205.
 
 2021-02-16: Previously, `last-split` option `-fMAF` was suggested.
             But this is the default setting since LAST 1180.
