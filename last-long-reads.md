@@ -15,77 +15,32 @@ Strong points of these recipes:
   in the reads relative to the genome, and discriminate between
   similar sequences.
 
-## Requirements
-
-For aligning to a mammal genome, you'll need a few dozen gigabytes of
-memory ([or
-less](https://gitlab.com/mcfrith/last/-/blob/main/doc/last-cookbook.rst)
-with `lastdb` option `-uRY`).
-
 First, install the latest [LAST][].  **This document assumes LAST
-version >= 983!!!**
+version >= 1387!!!**
 
 ## Preparing a reference genome
 
-Get a reference genome sequence, in FASTA format.
+Get a reference genome sequence, in FASTA format.  We need to
+[index][lastdb] the genome before aligning things to it:
 
-We need to decide [whether or not to mask
-repeats](https://gitlab.com/mcfrith/last/-/blob/main/doc/last-repeats.rst).
-Repeat-masking harms alignment accuracy (by hiding some correct
-alignments), but it *greatly* reduces the time and memory needed for
-alignment.
+    lastdb -P8 -uRY4 mydb genome.fa
 
-* For DNA reads with multiple coverage of a mammal genome: I would
-  probably mask repeats.
-
-* For RNA or cDNA reads: I would probably not mask repeats.
-
-Masking is often harmless.  Masked regions are ignored when finding
-similar regions, but are included in the final alignments.  So masking
-is harmless for alignments that include a bit of unmasked sequence
-next to masked regions.
-
-### Option 1: Prepare a genome without repeat-masking
-
-We need to [index][lastdb] the genome before aligning things to it:
-
-    lastdb -P8 -uNEAR mydb genome.fa
-
-This will create several files with names starting in "mydb".  It will
-detect and lowercase simple repeats, but it won't "mask" them.
+This will create several files with names starting in "mydb".
 
 * `-P8` makes it faster by running 8 parallel threads, adjust as
   appropriate for your computer.  This has no effect on the results.
 
+* `-uRY4` makes alignment faster and less memory-consuming, but less
+  sensitive, than the default.  This is suitable for aligning dozens
+  of gigabases to a mammal genome.
+
+For smaller genomes, or less data, or higher sensitivity, do this:
+
+    lastdb -P8 -uNEAR mydb genome.fa
+
 * `-uNEAR` tunes it for finding alignments with low rates of
   substitution (especially if they have high rates of insertion or
   deletion).
-
-### Option 2: Prepare a genome with repeat-masking
-
-We wish to mask as little as possible for the sake of alignment
-accuracy, but enough to make the alignment run-time tolerable.  LAST
-can detect simple repeats such as `atatatatatatat`, but not (yet)
-interspersed repeats: for that we can use WindowMasker.
-
-First, download [NCBI BLAST][] (which includes WindowMasker).
-
-Apply WindowMasker to the genome:
-
-    windowmasker -mk_counts -in genome.fa > genome.wmstat
-    windowmasker -ustat genome.wmstat -outfmt fasta -in genome.fa > genome-wm.fa
-
-This outputs a copy of the genome (`genome-wm.fa`) with interspersed
-repeats in lowercase.
-
-Now index the genome:
-
-    lastdb -P8 -uNEAR -R11 -c mydb genome-wm.fa
-
-* `-R11` tells it to preserve lowercase in the input, and additionally
-  convert simple sequence to lowercase.
-
-* `-c` tells it to "mask" lowercase.
 
 ## Substitution and gap rates
 
@@ -113,19 +68,15 @@ sequences with unusual composition, e.g. extremely AT-rich
 
 This recipe aligns DNA reads to their orthologous bases in the genome:
 
-    lastal -P8 -p myseq.par mydb myseq.fq | last-split > myseq.maf
-
-To make it faster (but less accurate), add `lastal` option `-k8`
-(say).  This should still be accurate for straightforward alignments,
-but perhaps not for intricately rearranged alignments.  (See also
-[here](https://gitlab.com/mcfrith/last/-/blob/main/doc/last-cookbook.rst)
-and
-[here](https://gitlab.com/mcfrith/last/-/blob/main/doc/last-tuning.rst)).
+    lastal -P8 --split -p myseq.par mydb myseq.fq > myseq.maf
 
 If you have big data, you may wish to compress the output.  One way is
 to modify the preceding command like this:
 
-    lastal -P8 -p myseq.par mydb myseq.fq | last-split | gzip > myseq.maf.gz
+    lastal -P8 --split -p myseq.par mydb myseq.fq | gzip > myseq.maf.gz
+
+If necessary, you can get faster but slightly worse compression with
+e.g. `gzip -5`.
 
 ## Spliced alignment of RNA or cDNA sequences
 
@@ -140,37 +91,24 @@ short and hard to find, especially if there are many insertion or
 deletion errors.  A typical mistake is to misalign (part of) an RNA to
 a processed pseudogene, which lacks introns, allowing a contiguous
 alignment.  This recipe tries to minimize such mistakes, but it
-probably won't avoid them completely.
+probably won't avoid them completely:
 
-The recipe requires [GNU parallel][] to be installed, which can be
-done like this:
+    lastal -P8 --splice -D10 -d90 -m20 -p myseq.par mydb myseq.fq > myseq.maf
 
-    wget http://ftpmirror.gnu.org/parallel/parallel-latest.tar.bz2
-    bunzip2 parallel-latest.tar.bz2
-    tar xf parallel-latest.tar
-    mkdir -p ~/bin
-    cp parallel-*/src/parallel ~/bin/
+**This assumes the reads are from forward strands of transcripts!!!**
+If your reads are a mixture of forward and reverse strands, do this to
+check splice signals (such as `gt`-`ag`) in both orientations:
 
-The recipe is:
+    lastal -P8 --split-d=2 -D10 -d90 -m20 -p myseq.par mydb myseq.fq > myseq.maf
 
-    parallel-fasta -j8 "lastal -p myseq.par -d90 -m20 -D10 mydb | last-split -g mydb" < myseq.fq > myseq.maf
+`-d90 -m20` makes it more accurate but slow.
 
-* `-j8` tells it to run 8 parallel jobs.
+* For even higher accuracy (but slowness), I would use `-m50` instead
+  of `-m20`.  In my tests with R9.4 2d sequences, this changed less
+  than 1% of the alignments.
 
-* **It assumes the reads are from forward strands of transcripts!!!**
-  If your reads are a mixture of forward and reverse strands, add
-  `last-split` option `-d2`: that makes it check splice signals (such
-  as `gt`-`ag`) in both orientations.
-
-* `-d90 -m20` makes it more accurate but slow.
-
-    - For even higher accuracy (but slowness), I would use `-m50`
-      instead of `-m20`.  In my tests with R9.4 2d sequences, this
-      changed less than 1% of the alignments.
-
-    - For higher speed (but lower accuracy), omit `-m20`.  In my
-      tests, this changed less than 2% of the alignments compared to
-      `-m50`.
+* For higher speed (but lower accuracy), omit `-m20`.  In my tests,
+  this changed less than 2% of the alignments compared to `-m50`.
 
 ## Alignment format conversion & visualization
 
@@ -195,6 +133,9 @@ Untested suggestions:
   (e.g. overlapping isoforms).
 
 ## Changes
+
+2022-06: Recommend the faster `RY4` option, and split-in-lastal
+         instead of separate `last-split`.
 
 2021-03: Previously, `lastdb` option `-R01` was suggested.  But this
          is the default setting since LAST 1205.
@@ -259,8 +200,31 @@ FASTQ -> FASTA with serial numbers:
 Some care is needed: if you do this separately for two datasets, and
 later combine them, then the serial numbers will not be unique.
 
+## Appendix D: Repeat masking
+
+This is an alternative recipe, which was used in several published
+papers.  It makes the alignment faster by "masking" repeats (instead
+of using `RY4`).
+
+First, download [NCBI BLAST][], which includes WindowMasker.  Apply
+WindowMasker to the genome:
+
+    windowmasker -mk_counts -in genome.fa > genome.wmstat
+    windowmasker -ustat genome.wmstat -outfmt fasta -in genome.fa > genome-wm.fa
+
+This outputs a copy of the genome (`genome-wm.fa`) with interspersed
+repeats in lowercase.  Now index the genome:
+
+    lastdb -P8 -uNEAR -R11 -c mydb genome-wm.fa
+
+* `-R11` tells it to preserve lowercase in the input, and additionally
+  convert simple sequence to lowercase.
+
+* `-c` tells it to "mask" lowercase.
+
+The subsequent `last-train` and alignment steps are the same as above.
+
 [LAST]: https://gitlab.com/mcfrith/last
 [lastdb]: https://gitlab.com/mcfrith/last/-/blob/main/doc/lastdb.rst
 [train]: https://gitlab.com/mcfrith/last/-/blob/main/doc/last-train.rst
 [NCBI BLAST]: https://blast.ncbi.nlm.nih.gov/
-[GNU parallel]: https://www.gnu.org/software/parallel/
