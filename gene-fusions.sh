@@ -59,7 +59,8 @@ segFromGenes $genes > $tmp.g
 
 segQueryLengths $tmp.r > $tmp.len
 
-alignment-types.py $alignments | sed 's/.://' | sort > $tmp.types
+alignment-types.py $alignments | tr '\t' ' ' |
+    sed 's/ .:/ /' | sort > $tmp.types
 
 seg-join $tmp.r $tmp.g | cut -f1,4- | seg-sort > $tmp.j0
 
